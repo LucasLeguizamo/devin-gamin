@@ -3,7 +3,7 @@ import { Boss } from '../entities/Boss';
 import { Target } from '../entities/Target';
 import { DifficultyManager } from '../managers/DifficultyManager';
 import { SpawnManager } from '../managers/SpawnManager';
-import { BOSS, GAME_COLORS, GAME_HEIGHT, GAME_WIDTH, PLAYER } from '../utils/constants';
+import { ASSET_KEYS, BOSS, GAME_COLORS, GAME_HEIGHT, GAME_WIDTH, PLAYER } from '../utils/constants';
 
 export class GameScene extends Phaser.Scene {
   private difficultyManager!: DifficultyManager;
@@ -16,36 +16,58 @@ export class GameScene extends Phaser.Scene {
   private lives = PLAYER.maxLives;
   private inBossFight = false;
   private canShoot = true;
+  private isGameOver = false;
 
   private nextSpawnAt = 0;
   private bossDeadline = 0;
 
   private crosshair!: Phaser.GameObjects.Container;
+  private weaponArm!: Phaser.GameObjects.Image;
 
   constructor() {
     super('game');
   }
 
   create(): void {
+    this.targets = [];
+    this.boss = undefined;
+    this.score = 0;
+    this.lives = PLAYER.maxLives;
+    this.inBossFight = false;
+    this.canShoot = true;
+    this.isGameOver = false;
+    this.nextSpawnAt = 0;
+    this.bossDeadline = 0;
+
     this.createBackground();
 
     this.difficultyManager = new DifficultyManager();
     this.spawnManager = new SpawnManager(this, GAME_WIDTH, GAME_HEIGHT);
 
     this.input.setDefaultCursor('none');
+    this.createWeaponArm();
     this.createCrosshair();
 
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (this.isGameOver) {
+        return;
+      }
+
       this.crosshair.setPosition(pointer.x, pointer.y);
+      this.updateWeaponAim(pointer.x, pointer.y);
     });
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (!this.canShoot) {
+      if (this.isGameOver || !this.canShoot) {
         return;
       }
 
       this.canShoot = false;
       this.time.delayedCall(PLAYER.fireCooldownMs, () => {
+        if (this.isGameOver) {
+          return;
+        }
+
         this.canShoot = true;
       });
 
@@ -56,6 +78,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
+    if (this.isGameOver) {
+      return;
+    }
+
     const deltaS = delta / 1000;
 
     if (!this.inBossFight && time >= this.nextSpawnAt) {
@@ -63,15 +89,25 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.targets = this.targets.filter((target) => {
+      if (this.isGameOver || target.isConsumed) {
+        return false;
+      }
+
       const alive = target.update(time, deltaS, GAME_WIDTH, GAME_HEIGHT);
 
       if (!alive) {
         target.expire();
-        this.loseLife(1);
+        if (!this.isGameOver) {
+          this.loseLife(1);
+        }
       }
 
       return alive;
     });
+
+    if (this.isGameOver) {
+      return;
+    }
 
     if (this.inBossFight && time >= this.bossDeadline) {
       this.finishBoss(false);
@@ -79,25 +115,24 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createBackground(): void {
-    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, GAME_COLORS.background, 1);
+    this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, GAME_COLORS.background, 1)
+      .setDepth(-120);
 
-    for (let i = 0; i < 50; i += 1) {
-      const star = this.add.circle(
-        Phaser.Math.Between(0, GAME_WIDTH),
-        Phaser.Math.Between(0, GAME_HEIGHT),
-        Phaser.Math.Between(1, 2),
-        0xffffff,
-        Phaser.Math.FloatBetween(0.3, 0.8),
-      );
+    this.add
+      .image(GAME_WIDTH / 2, GAME_HEIGHT / 2, ASSET_KEYS.background)
+      .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+      .setDepth(-100);
 
-      this.tweens.add({
-        targets: star,
-        alpha: Phaser.Math.FloatBetween(0.15, 0.95),
-        yoyo: true,
-        repeat: -1,
-        duration: Phaser.Math.Between(800, 2300),
-      });
-    }
+    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.18).setDepth(-90);
+  }
+
+  private createWeaponArm(): void {
+    this.weaponArm = this.add
+      .image(GAME_WIDTH * 0.66, GAME_HEIGHT + 110, ASSET_KEYS.weaponArm)
+      .setOrigin(0.52, 0.82)
+      .setScale(0.34)
+      .setDepth(420);
   }
 
   private createCrosshair(): void {
@@ -110,6 +145,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private spawnTarget(): void {
+    if (this.isGameOver || this.inBossFight) {
+      return;
+    }
+
     const snapshot = this.difficultyManager.getSnapshot();
 
     const target = this.spawnManager.spawnTarget(
@@ -119,6 +158,10 @@ export class GameScene extends Phaser.Scene {
     );
 
     target.on('pointerdown', () => {
+      if (this.isGameOver || target.isConsumed) {
+        return;
+      }
+
       this.onTargetDestroyed(target);
     });
 
@@ -128,6 +171,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleShot(pointer: Phaser.Input.Pointer): void {
+    if (this.isGameOver) {
+      return;
+    }
+
+    this.kickWeapon();
     this.makeMuzzleFlash(pointer.x, pointer.y);
 
     if (!this.inBossFight || !this.boss) {
@@ -153,7 +201,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onTargetDestroyed(target: Target): void {
-    if (this.inBossFight) {
+    if (this.isGameOver || this.inBossFight || target.isConsumed) {
       return;
     }
 
@@ -175,6 +223,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private startBossFight(): void {
+    if (this.isGameOver || this.inBossFight) {
+      return;
+    }
+
     this.inBossFight = true;
 
     this.targets.forEach((target) => target.expire());
@@ -188,10 +240,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private finishBoss(playerWon: boolean): void {
-    if (!this.boss) {
+    if (this.isGameOver || !this.boss) {
       return;
     }
 
+    this.boss.disableCriticalInput();
     this.boss.destroy();
     this.boss = undefined;
     this.inBossFight = false;
@@ -201,6 +254,10 @@ export class GameScene extends Phaser.Scene {
       this.difficultyManager.resetBossCycle();
     } else {
       this.loseLife(BOSS.incomingDamageIfTimeout);
+      if (this.isGameOver) {
+        return;
+      }
+
       this.difficultyManager.resetBossCycle();
     }
 
@@ -209,6 +266,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private loseLife(amount: number): void {
+    if (this.isGameOver) {
+      return;
+    }
+
     this.lives = Math.max(0, this.lives - amount);
     this.pushUiUpdate();
 
@@ -218,6 +279,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   private endRun(): void {
+    if (this.isGameOver) {
+      return;
+    }
+
+    this.isGameOver = true;
+    this.canShoot = false;
+    this.clearTargets();
+
+    if (this.boss) {
+      this.boss.disableCriticalInput();
+      this.boss.destroy();
+      this.boss = undefined;
+    }
+
+    this.inBossFight = false;
     this.input.setDefaultCursor('default');
     this.input.removeAllListeners();
 
@@ -226,6 +302,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private makeMuzzleFlash(x: number, y: number): void {
+    if (this.isGameOver) {
+      return;
+    }
+
     const flash = this.add.circle(x, y, 6, 0xffffff, 0.85).setDepth(450);
 
     this.tweens.add({
@@ -234,6 +314,30 @@ export class GameScene extends Phaser.Scene {
       alpha: 0,
       duration: 110,
       onComplete: () => flash.destroy(),
+    });
+  }
+
+  private updateWeaponAim(pointerX: number, pointerY: number): void {
+    const horizontalAim = Phaser.Math.Clamp((pointerX - GAME_WIDTH / 2) / (GAME_WIDTH / 2), -1, 1);
+    const verticalAim = Phaser.Math.Clamp((pointerY - GAME_HEIGHT / 2) / (GAME_HEIGHT / 2), -1, 1);
+
+    this.weaponArm.setPosition(GAME_WIDTH * 0.66 + horizontalAim * 18, GAME_HEIGHT + 110 + verticalAim * 8);
+    this.weaponArm.setRotation(horizontalAim * 0.08);
+  }
+
+  private kickWeapon(): void {
+    if (!this.weaponArm) {
+      return;
+    }
+
+    this.tweens.killTweensOf(this.weaponArm);
+    this.tweens.add({
+      targets: this.weaponArm,
+      y: this.weaponArm.y + 18,
+      angle: this.weaponArm.angle + 4,
+      yoyo: true,
+      duration: 55,
+      ease: 'Quad.easeOut',
     });
   }
 
@@ -247,5 +351,14 @@ export class GameScene extends Phaser.Scene {
       inBossFight: this.inBossFight,
       remainingCriticals,
     });
+  }
+
+  private clearTargets(): void {
+    this.targets.forEach((target) => {
+      target.disableInteractive();
+      target.removeAllListeners('pointerdown');
+      target.destroy();
+    });
+    this.targets = [];
   }
 }

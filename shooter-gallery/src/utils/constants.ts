@@ -1,6 +1,24 @@
 export const GAME_WIDTH = 1280;
 export const GAME_HEIGHT = 720;
 
+export const ASSET_KEYS = {
+  background: 'bg_pixel_art',
+  weaponArm: 'weapon_arm',
+  enemies: {
+    openai: 'enemy_openai',
+    grok: 'enemy_grok',
+    gemini: 'enemy_gemini',
+    kimi: 'enemy_kimi',
+  },
+};
+
+export const ENEMY_ASSET_KEYS = [
+  ASSET_KEYS.enemies.openai,
+  ASSET_KEYS.enemies.grok,
+  ASSET_KEYS.enemies.gemini,
+  ASSET_KEYS.enemies.kimi,
+];
+
 export const GAME_COLORS = {
   background: 0x081018,
   panel: 0x0f1c2a,

@@ -69,6 +69,7 @@ export class Boss extends Phaser.GameObjects.Container {
 
     if (point.hp <= 0) {
       point.alive = false;
+      point.node.disableInteractive();
       this.scene.tweens.add({
         targets: point.node,
         alpha: 0.2,
@@ -80,10 +81,17 @@ export class Boss extends Phaser.GameObjects.Container {
   }
 
   public getInteractiveNodes(): Phaser.GameObjects.Container[] {
-    return this.criticalPoints.map((entry) => entry.node);
+    return this.criticalPoints.filter((entry) => entry.alive).map((entry) => entry.node);
   }
 
   public getRemainingCriticals(): number {
     return this.criticalPoints.filter((entry) => entry.alive).length;
+  }
+
+  public disableCriticalInput(): void {
+    this.criticalPoints.forEach((entry) => {
+      entry.alive = false;
+      entry.node.disableInteractive();
+    });
   }
 }

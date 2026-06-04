@@ -8,8 +8,17 @@ export class Target extends Phaser.GameObjects.Container {
   private bornAtMs: number;
   private ttlMs: number;
   private destroyed = false;
+  private transitioning = false;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, radius: number, speed: number, ttlMs: number) {
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    radius: number,
+    speed: number,
+    ttlMs: number,
+    textureKey: string,
+  ) {
     super(scene, x, y);
 
     this.radius = radius;
@@ -17,10 +26,11 @@ export class Target extends Phaser.GameObjects.Container {
     this.velocityX = Phaser.Math.FloatBetween(-1, 1) * speed;
     this.velocityY = Phaser.Math.FloatBetween(-1, 1) * speed;
 
-    const bodyCircle = scene.add.circle(0, 0, radius, GAME_COLORS.warning, 0.85);
-    const innerCircle = scene.add.circle(0, 0, radius * 0.42, GAME_COLORS.danger, 0.95);
+    const glow = scene.add.circle(0, 0, radius, GAME_COLORS.accent, 0.22).setStrokeStyle(2, GAME_COLORS.accent, 0.7);
+    const enemyIcon = scene.add.image(0, 0, textureKey);
+    enemyIcon.setDisplaySize(radius * 1.65, radius * 1.65);
 
-    this.add([bodyCircle, innerCircle]);
+    this.add([glow, enemyIcon]);
     this.setSize(radius * 2, radius * 2);
 
     this.bornAtMs = scene.time.now;
@@ -34,7 +44,7 @@ export class Target extends Phaser.GameObjects.Container {
   }
 
   public update(now: number, deltaS: number, width: number, height: number): boolean {
-    if (this.destroyed) {
+    if (this.isConsumed) {
       return false;
     }
 
@@ -53,7 +63,20 @@ export class Target extends Phaser.GameObjects.Container {
     return !timedOut;
   }
 
+  public get isConsumed(): boolean {
+    return this.destroyed || this.transitioning || !this.active;
+  }
+
   public explode(): void {
+    if (!this.beginTransition()) {
+      return;
+    }
+
+    if (!this.canCreateTween()) {
+      this.destroy();
+      return;
+    }
+
     this.destroyed = true;
     this.scene.tweens.add({
       targets: this,
@@ -65,6 +88,15 @@ export class Target extends Phaser.GameObjects.Container {
   }
 
   public expire(): void {
+    if (!this.beginTransition()) {
+      return;
+    }
+
+    if (!this.canCreateTween()) {
+      this.destroy();
+      return;
+    }
+
     this.destroyed = true;
     this.scene.tweens.add({
       targets: this,
@@ -72,5 +104,21 @@ export class Target extends Phaser.GameObjects.Container {
       duration: 120,
       onComplete: () => this.destroy(),
     });
+  }
+
+  private beginTransition(): boolean {
+    if (this.isConsumed) {
+      return false;
+    }
+
+    this.transitioning = true;
+    this.disableInteractive();
+    this.removeAllListeners('pointerdown');
+
+    return true;
+  }
+
+  private canCreateTween(): boolean {
+    return Boolean(this.scene?.sys?.isActive() && this.scene.tweens);
   }
 }

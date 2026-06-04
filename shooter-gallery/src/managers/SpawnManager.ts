@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { TARGET } from '../utils/constants';
+import { ENEMY_ASSET_KEYS, TARGET } from '../utils/constants';
 import { Target } from '../entities/Target';
 
 export class SpawnManager {
@@ -18,7 +18,8 @@ export class SpawnManager {
     const x = Phaser.Math.Between(Math.floor(radius), Math.floor(this.width - radius));
     const y = Phaser.Math.Between(Math.floor(radius), Math.floor(this.height - radius));
     const speed = Phaser.Math.FloatBetween(minSpeed, maxSpeed);
+    const textureKey = Phaser.Utils.Array.GetRandom(ENEMY_ASSET_KEYS);
 
-    return new Target(this.scene, x, y, radius, speed, TARGET.ttlMs);
+    return new Target(this.scene, x, y, radius, speed, TARGET.ttlMs, textureKey);
   }
 }

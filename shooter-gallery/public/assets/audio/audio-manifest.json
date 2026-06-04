@@ -1,0 +1,86 @@
+{
+  "sfx": [
+    {
+      "key": "sfx_shoot",
+      "files": ["sfx/shoot.mp3", "sfx/shoot.ogg"],
+      "trigger": "Cada click del jugador (pointerdown en GameScene)",
+      "suggested": "Disparo seco, corto ~0.1s. Pistola pequeña o láser suave."
+    },
+    {
+      "key": "sfx_target_hit",
+      "files": ["sfx/target_hit.mp3", "sfx/target_hit.ogg"],
+      "trigger": "Target.explode() — objetivo destruido correctamente",
+      "suggested": "Explosión pequeña satisfactoria, ~0.3s. Pop + crunch."
+    },
+    {
+      "key": "sfx_target_miss",
+      "files": ["sfx/target_miss.mp3", "sfx/target_miss.ogg"],
+      "trigger": "Target.expire() — objetivo se fue sin disparar, pierde vida",
+      "suggested": "Sonido de falla/alarma breve, ~0.4s. Buzz o tono descendente."
+    },
+    {
+      "key": "sfx_lose_life",
+      "files": ["sfx/lose_life.mp3", "sfx/lose_life.ogg"],
+      "trigger": "GameScene.loseLife() — cualquier pérdida de vida",
+      "suggested": "Impacto grave + reverb corto, ~0.5s. Separado de target_miss para dar énfasis."
+    },
+    {
+      "key": "sfx_boss_start",
+      "files": ["sfx/boss_start.mp3", "sfx/boss_start.ogg"],
+      "trigger": "GameScene.startBossFight() — aparece el boss",
+      "suggested": "Stinger dramático, ~1.5s. Sirena + hit orquestal."
+    },
+    {
+      "key": "sfx_boss_critical_hit",
+      "files": ["sfx/boss_critical_hit.mp3", "sfx/boss_critical_hit.ogg"],
+      "trigger": "Boss.hitCritical() — impacto en punto crítico, HP > 0",
+      "suggested": "Metálico + eléctrico, ~0.2s. Diferente a target_hit."
+    },
+    {
+      "key": "sfx_boss_critical_destroy",
+      "files": ["sfx/boss_critical_destroy.mp3", "sfx/boss_critical_destroy.ogg"],
+      "trigger": "Boss.hitCritical() — punto crítico HP llega a 0",
+      "suggested": "Explosión más grande + pitch down, ~0.5s. Más peso que critical_hit."
+    },
+    {
+      "key": "sfx_boss_defeat",
+      "files": ["sfx/boss_defeat.mp3", "sfx/boss_defeat.ogg"],
+      "trigger": "GameScene.finishBoss(true) — jugador destruye todos los puntos críticos",
+      "suggested": "Victoria corta, ~1.5s. Fanfare + explosión final."
+    },
+    {
+      "key": "sfx_boss_timeout",
+      "files": ["sfx/boss_timeout.mp3", "sfx/boss_timeout.ogg"],
+      "trigger": "GameScene.finishBoss(false) — tiempo del boss agotado, jugador recibe daño",
+      "suggested": "Alarma + tono de falla grave, ~1s. Más oscuro que boss_defeat."
+    },
+    {
+      "key": "sfx_game_over",
+      "files": ["sfx/game_over.mp3", "sfx/game_over.ogg"],
+      "trigger": "GameScene.endRun() — vidas llegan a 0",
+      "suggested": "Stinger final dramático, ~2s. Tono descendente + silencio."
+    }
+  ],
+  "music": [
+    {
+      "key": "music_gameplay",
+      "files": ["music/gameplay.mp3", "music/gameplay.ogg"],
+      "trigger": "Loop durante el juego normal (fuera de boss fight)",
+      "suggested": "Electrónico/synthwave tenso, BPM 110-130. Loop perfecto, duración 60-120s."
+    },
+    {
+      "key": "music_boss",
+      "files": ["music/boss.mp3", "music/boss.ogg"],
+      "trigger": "Loop durante la fase de boss",
+      "suggested": "Más intenso/oscuro que gameplay. Mismo estilo, BPM más alto o más percusión."
+    }
+  ],
+  "format_notes": {
+    "primary": "mp3 (compatibilidad universal)",
+    "fallback": "ogg (Firefox + compresión mejor)",
+    "sample_rate": "44100 Hz",
+    "bit_depth": "16-bit",
+    "sfx_max_duration_s": 3,
+    "music_loop_gapless": true
+  }
+}

@@ -21,6 +21,7 @@ A satisfying small explosion pop when a glowing circle target is destroyed. Shor
 
 ---
 
+
 ### `sfx/target_miss`
 ```
 A short descending buzz indicating a missed opportunity or failure. 0.4 seconds. Sounds like a low-pitched electric beep going down in pitch, slightly harsh. Arcade game penalty sound.

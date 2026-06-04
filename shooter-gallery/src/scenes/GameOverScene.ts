@@ -25,7 +25,7 @@ export class GameOverScene extends Phaser.Scene {
     const score = Number.isFinite(data.score) ? Math.max(0, Math.floor(data.score)) : 0;
     const scores = this.leaderboardStore.getTopScores();
 
-    this.nameInput = '';
+    this.nameInput = (this.registry.get('playerName') as string | undefined) ?? '';
     this.savedScore = false;
     this.highScore = this.leaderboardStore.isHighScore(score);
     this.canRestart = !this.highScore;
@@ -34,15 +34,25 @@ export class GameOverScene extends Phaser.Scene {
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.65);
 
     this.add
-      .text(GAME_WIDTH / 2, 92, 'GAME OVER', {
+      .text(GAME_WIDTH / 2, 80, 'GAME OVER', {
         fontFamily: 'Arial Black',
-        fontSize: '68px',
+        fontSize: '60px',
         color: '#ff4b4b',
       })
       .setOrigin(0.5);
 
     this.add
-      .text(GAME_WIDTH / 2, 166, `Puntaje final: ${score}`, {
+      .text(GAME_WIDTH / 2, 132, 'TE QUEDASTE SIN CHAMBA!!!', {
+        fontFamily: 'Arial Black',
+        fontSize: '30px',
+        color: '#ffb454',
+        stroke: '#000000',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5);
+
+    this.add
+      .text(GAME_WIDTH / 2, 178, `Puntaje final: ${score}`, {
         fontFamily: 'Arial',
         fontSize: '34px',
         color: GAME_COLORS.text,

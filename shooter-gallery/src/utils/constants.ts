@@ -4,6 +4,7 @@ export const GAME_HEIGHT = 720;
 export const ASSET_KEYS = {
   background: 'bg_pixel_art',
   weaponArm: 'weapon_arm',
+  bossVideo: 'boss_video',
   enemies: {
     openai: 'enemy_openai',
     grok: 'enemy_grok',
@@ -52,7 +53,7 @@ export const DIFFICULTY = {
 };
 
 export const BOSS = {
-  triggerEveryKills: 20,
+  triggerEveryKills: 10,
   baseHitPointsPerCritical: 4,
   criticalPointsCount: 5,
   incomingDamageIfTimeout: 1,

@@ -4,6 +4,7 @@ import { Target } from '../entities/Target';
 import { DifficultyManager } from '../managers/DifficultyManager';
 import { SpawnManager } from '../managers/SpawnManager';
 import { ASSET_KEYS, BOSS, GAME_COLORS, GAME_HEIGHT, GAME_WIDTH, PLAYER } from '../utils/constants';
+import { MUSIC, SFX } from '../utils/audioKeys';
 
 export class GameScene extends Phaser.Scene {
   private difficultyManager!: DifficultyManager;
@@ -23,6 +24,7 @@ export class GameScene extends Phaser.Scene {
 
   private crosshair!: Phaser.GameObjects.Container;
   private weaponArm!: Phaser.GameObjects.Image;
+  private music?: Phaser.Sound.BaseSound;
 
   constructor() {
     super('game');
@@ -74,6 +76,9 @@ export class GameScene extends Phaser.Scene {
       this.handleShot(pointer);
     });
 
+    this.playMusic(MUSIC.gameplay);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.stopMusic());
+
     this.pushUiUpdate(0);
   }
 
@@ -97,6 +102,7 @@ export class GameScene extends Phaser.Scene {
 
       if (!alive) {
         target.expire();
+        this.playSfx(SFX.targetMiss, 0.5);
         if (!this.isGameOver) {
           this.loseLife(1);
         }
@@ -157,14 +163,6 @@ export class GameScene extends Phaser.Scene {
       snapshot.targetScaleFactor,
     );
 
-    target.on('pointerdown', () => {
-      if (this.isGameOver || target.isConsumed) {
-        return;
-      }
-
-      this.onTargetDestroyed(target);
-    });
-
     this.targets.push(target);
     this.nextSpawnAt = this.time.now + snapshot.spawnIntervalMs;
     this.pushUiUpdate();
@@ -177,26 +175,43 @@ export class GameScene extends Phaser.Scene {
 
     this.kickWeapon();
     this.makeMuzzleFlash(pointer.x, pointer.y);
+    this.playSfx(SFX.shoot, 0.4);
 
-    if (!this.inBossFight || !this.boss) {
+    if (!this.inBossFight) {
+      // Detección geométrica: destruimos el blanco más reciente (encima) bajo el disparo.
+      for (let i = this.targets.length - 1; i >= 0; i--) {
+        const target = this.targets[i];
+
+        if (target.hitTest(pointer.x, pointer.y)) {
+          this.onTargetDestroyed(target);
+          return;
+        }
+      }
+
       return;
     }
 
-    const hit = this.input.hitTestPointer(pointer);
-    for (const gameObject of hit) {
-      const isCriticalNode = this.boss.getInteractiveNodes().includes(gameObject as Phaser.GameObjects.Container);
+    if (!this.boss) {
+      return;
+    }
 
-      if (isCriticalNode) {
-        const cleared = this.boss.hitCritical(gameObject);
-        this.cameras.main.shake(85, 0.0032);
-        this.pushUiUpdate(this.boss.getRemainingCriticals());
+    const result = this.boss.hitCriticalAt(pointer.x, pointer.y);
 
-        if (cleared) {
-          this.finishBoss(true);
-        }
+    if (result === 'none') {
+      return;
+    }
 
-        return;
-      }
+    if (result === 'destroyed') {
+      this.playSfx(SFX.bossCriticalDestroy, 0.7);
+    } else {
+      this.playSfx(SFX.bossCriticalHit, 0.6);
+    }
+
+    this.cameras.main.shake(85, 0.0032);
+    this.pushUiUpdate(this.boss.getRemainingCriticals());
+
+    if (this.boss.isCleared()) {
+      this.finishBoss(true);
     }
   }
 
@@ -206,6 +221,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     target.explode();
+    this.playSfx(SFX.targetHit, 0.6);
     this.targets = this.targets.filter((entry) => entry !== target);
 
     this.score += 10;
@@ -229,6 +245,9 @@ export class GameScene extends Phaser.Scene {
 
     this.inBossFight = true;
 
+    this.playSfx(SFX.bossStart, 0.7);
+    this.playMusic(MUSIC.boss);
+
     this.targets.forEach((target) => target.expire());
     this.targets = [];
 
@@ -250,9 +269,11 @@ export class GameScene extends Phaser.Scene {
     this.inBossFight = false;
 
     if (playerWon) {
+      this.playSfx(SFX.bossDefeat, 0.7);
       this.score += 200;
       this.difficultyManager.resetBossCycle();
     } else {
+      this.playSfx(SFX.bossTimeout, 0.7);
       this.loseLife(BOSS.incomingDamageIfTimeout);
       if (this.isGameOver) {
         return;
@@ -261,6 +282,7 @@ export class GameScene extends Phaser.Scene {
       this.difficultyManager.resetBossCycle();
     }
 
+    this.playMusic(MUSIC.gameplay);
     this.nextSpawnAt = this.time.now + 900;
     this.pushUiUpdate();
   }
@@ -271,6 +293,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.lives = Math.max(0, this.lives - amount);
+    this.playSfx(SFX.loseLife, 0.6);
+    this.flashRed();
+    this.showLifeLostMessage();
     this.pushUiUpdate();
 
     if (this.lives <= 0) {
@@ -285,6 +310,8 @@ export class GameScene extends Phaser.Scene {
 
     this.isGameOver = true;
     this.canShoot = false;
+    this.stopMusic();
+    this.playSfx(SFX.gameOver, 0.7);
     this.clearTargets();
 
     if (this.boss) {
@@ -351,6 +378,102 @@ export class GameScene extends Phaser.Scene {
       inBossFight: this.inBossFight,
       remainingCriticals,
     });
+  }
+
+  private showLifeLostMessage(): void {
+    // Mensaje temático según las vidas que quedan tras perder una.
+    const messages: Record<number, string> = {
+      2: 'PERDISTE BENEFICIOS',
+      1: 'TE HAN BAJADO EL SUELDO',
+    };
+
+    const message = messages[this.lives];
+    if (!message) {
+      return;
+    }
+
+    const banner = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, message, {
+        fontFamily: 'Arial Black',
+        fontSize: '58px',
+        color: '#ff4b4b',
+        stroke: '#000000',
+        strokeThickness: 8,
+        align: 'center',
+      })
+      .setOrigin(0.5)
+      .setDepth(650)
+      .setScale(0.6);
+
+    this.tweens.add({
+      targets: banner,
+      scale: 1,
+      duration: 180,
+      ease: 'Back.easeOut',
+    });
+
+    this.tweens.add({
+      targets: banner,
+      alpha: 0,
+      delay: 900,
+      duration: 450,
+      onComplete: () => banner.destroy(),
+    });
+  }
+
+  private flashRed(): void {
+    const overlay = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, GAME_COLORS.danger, 0.45)
+      .setDepth(600);
+
+    this.tweens.add({
+      targets: overlay,
+      alpha: 0,
+      duration: 120,
+      yoyo: true,
+      repeat: 1,
+      onComplete: () => overlay.destroy(),
+    });
+  }
+
+  private playSfx(key: string, volume = 0.6): void {
+    if (!this.cache.audio.exists(key)) {
+      return;
+    }
+
+    this.sound.play(key, { volume });
+  }
+
+  private playMusic(key: string): void {
+    this.stopMusic();
+
+    if (!this.cache.audio.exists(key)) {
+      return;
+    }
+
+    const start = (): void => {
+      if (this.isGameOver) {
+        return;
+      }
+
+      this.music = this.sound.add(key, { loop: true, volume: 0.3 });
+      this.music.play();
+    };
+
+    // El navegador bloquea el audio hasta el primer gesto del usuario (primer disparo).
+    if (this.sound.locked) {
+      this.sound.once(Phaser.Sound.Events.UNLOCKED, start);
+    } else {
+      start();
+    }
+  }
+
+  private stopMusic(): void {
+    if (this.music) {
+      this.music.stop();
+      this.music.destroy();
+      this.music = undefined;
+    }
   }
 
   private clearTargets(): void {

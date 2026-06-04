@@ -1,8 +1,11 @@
 import Phaser from 'phaser';
-import { BOSS, GAME_COLORS } from '../utils/constants';
+import { ASSET_KEYS, BOSS, GAME_COLORS } from '../utils/constants';
 
 interface CriticalPoint {
   node: Phaser.GameObjects.Container;
+  x: number;
+  y: number;
+  radius: number;
   hp: number;
   alive: boolean;
 }
@@ -13,14 +16,34 @@ export class Boss extends Phaser.GameObjects.Container {
   constructor(scene: Phaser.Scene, width: number, height: number) {
     super(scene, width / 2, height / 2);
 
-    const frame = scene.add.rectangle(0, 0, width * 0.94, height * 0.9, GAME_COLORS.panel, 0.95);
-    frame.setStrokeStyle(4, GAME_COLORS.accent, 0.75);
+    // Fondo oscuro para enfocar la atención en el boss.
+    const backdrop = scene.add.rectangle(0, 0, width, height, 0x000000, 0.55);
 
-    const face = scene.add.ellipse(0, 0, width * 0.5, height * 0.56, 0x1f3148, 0.95);
-    const eyeLeft = scene.add.circle(-130, -60, 30, GAME_COLORS.warning, 0.95);
-    const eyeRight = scene.add.circle(130, -60, 30, GAME_COLORS.warning, 0.95);
+    // Video del boss en loop, muteado para no pisar la música.
+    const maxWidth = width * 0.7;
+    const maxHeight = height * 0.82;
 
-    this.add([frame, face, eyeLeft, eyeRight]);
+    const bossVideo = scene.add.video(0, 0, ASSET_KEYS.bossVideo);
+    bossVideo.setMute(true);
+    bossVideo.play(true);
+
+    const fitVideo = (): void => {
+      const vw = bossVideo.width;
+      const vh = bossVideo.height;
+      if (!vw || !vh) {
+        return;
+      }
+
+      bossVideo.setScale(Math.min(maxWidth / vw, maxHeight / vh));
+    };
+
+    // Las dimensiones del video recién están disponibles cuando su textura se crea.
+    bossVideo.on('created', fitVideo);
+    bossVideo.on('textureready', fitVideo);
+    bossVideo.on('play', fitVideo);
+    fitVideo();
+
+    this.add([backdrop, bossVideo]);
 
     const points = [
       { x: 0, y: -160 },
@@ -30,18 +53,22 @@ export class Boss extends Phaser.GameObjects.Container {
       { x: 75, y: 170 },
     ];
 
+    const criticalRadius = 36;
+
     points.forEach((position) => {
       const wrapper = scene.add.container(position.x, position.y);
-      const outer = scene.add.circle(0, 0, 36, GAME_COLORS.accent, 0.8);
+      const outer = scene.add.circle(0, 0, criticalRadius, GAME_COLORS.accent, 0.8);
       const core = scene.add.circle(0, 0, 14, GAME_COLORS.success, 1);
       wrapper.add([outer, core]);
 
-      wrapper.setSize(72, 72);
-      wrapper.setInteractive(new Phaser.Geom.Circle(0, 0, 36), Phaser.Geom.Circle.Contains);
+      wrapper.setSize(criticalRadius * 2, criticalRadius * 2);
       this.add(wrapper);
 
       this.criticalPoints.push({
         node: wrapper,
+        x: position.x,
+        y: position.y,
+        radius: criticalRadius,
         hp: BOSS.baseHitPointsPerCritical,
         alive: true,
       });
@@ -50,11 +77,19 @@ export class Boss extends Phaser.GameObjects.Container {
     scene.add.existing(this);
   }
 
-  public hitCritical(targetNode: Phaser.GameObjects.GameObject): boolean {
-    const point = this.criticalPoints.find((entry) => entry.node === targetNode);
+  public hitCriticalAt(worldX: number, worldY: number): 'none' | 'hit' | 'destroyed' {
+    // Los puntos críticos son hijos del boss: convertimos el disparo a coordenadas locales.
+    const localX = worldX - this.x;
+    const localY = worldY - this.y;
 
-    if (!point || !point.alive) {
-      return false;
+    const point = this.criticalPoints.find(
+      (entry) =>
+        entry.alive &&
+        Phaser.Math.Distance.Between(localX, localY, entry.x, entry.y) <= entry.radius,
+    );
+
+    if (!point) {
+      return 'none';
     }
 
     point.hp -= 1;
@@ -69,19 +104,20 @@ export class Boss extends Phaser.GameObjects.Container {
 
     if (point.hp <= 0) {
       point.alive = false;
-      point.node.disableInteractive();
       this.scene.tweens.add({
         targets: point.node,
         alpha: 0.2,
         duration: 160,
       });
+
+      return 'destroyed';
     }
 
-    return this.criticalPoints.every((entry) => !entry.alive);
+    return 'hit';
   }
 
-  public getInteractiveNodes(): Phaser.GameObjects.Container[] {
-    return this.criticalPoints.filter((entry) => entry.alive).map((entry) => entry.node);
+  public isCleared(): boolean {
+    return this.criticalPoints.every((entry) => !entry.alive);
   }
 
   public getRemainingCriticals(): number {

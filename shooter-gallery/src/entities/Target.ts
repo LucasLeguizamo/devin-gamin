@@ -35,11 +35,6 @@ export class Target extends Phaser.GameObjects.Container {
 
     this.bornAtMs = scene.time.now;
 
-    this.setInteractive(
-      new Phaser.Geom.Circle(0, 0, radius),
-      Phaser.Geom.Circle.Contains,
-    );
-
     scene.add.existing(this);
   }
 
@@ -65,6 +60,14 @@ export class Target extends Phaser.GameObjects.Container {
 
   public get isConsumed(): boolean {
     return this.destroyed || this.transitioning || !this.active;
+  }
+
+  public hitTest(pointerX: number, pointerY: number): boolean {
+    if (this.isConsumed) {
+      return false;
+    }
+
+    return Phaser.Math.Distance.Between(pointerX, pointerY, this.x, this.y) <= this.radius;
   }
 
   public explode(): void {

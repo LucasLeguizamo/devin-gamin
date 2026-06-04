@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_COLORS } from '../utils/constants';
+import { GAME_COLORS, GAME_WIDTH } from '../utils/constants';
 
 export class UIScene extends Phaser.Scene {
   private scoreText!: Phaser.GameObjects.Text;
@@ -19,6 +19,16 @@ export class UIScene extends Phaser.Scene {
       stroke: '#000000',
       strokeThickness: 3,
     };
+
+    this.add
+      .text(GAME_WIDTH / 2, 18, 'SALVA TU CHAMBA DE LA IA', {
+        fontFamily: 'Arial Black',
+        fontSize: '30px',
+        color: '#2de2e6',
+        stroke: '#000000',
+        strokeThickness: 5,
+      })
+      .setOrigin(0.5, 0);
 
     this.scoreText = this.add.text(18, 14, 'Score: 0', textStyle);
     this.livesText = this.add.text(18, 44, 'Vidas: 3', textStyle);
